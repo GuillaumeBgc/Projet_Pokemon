@@ -1,0 +1,4 @@
+"0","d        = dist(Iris.data)"
+"0","cah.ward = hclust(d,method=""ward.D"")"
+"0",""
+"0","plot(cah.ward,hang=-1)"

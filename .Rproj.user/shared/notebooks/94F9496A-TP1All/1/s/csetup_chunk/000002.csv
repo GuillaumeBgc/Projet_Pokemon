@@ -1,0 +1,4 @@
+"0","require(knitr)"
+"0","opts_knit$set(root.dir = """")"
+"0","library(ade4)"
+"0","library(FactoMineR)"

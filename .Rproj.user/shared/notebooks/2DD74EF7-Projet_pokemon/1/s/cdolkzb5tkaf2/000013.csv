@@ -1,0 +1,4 @@
+"0",""
+"0","coord <- data.frame(resAF$ind$coord)"
+"0","test.kmeans <- kmeans(coord,2,nstart=50)"
+"0","clusplot(select(data.quanti,-c(id,grp)),test.kmeans$cluster,labels=4,col.p=as.numeric(data.quanti$grp))"

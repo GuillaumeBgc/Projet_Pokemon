@@ -1,0 +1,2 @@
+"0","df <- pokedex %>% distinct(pokedex_number,.keep_all = TRUE)"
+"0","df <- df[-1:-2]"

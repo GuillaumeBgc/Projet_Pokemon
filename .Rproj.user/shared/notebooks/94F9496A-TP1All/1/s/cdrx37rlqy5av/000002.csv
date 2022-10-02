@@ -1,0 +1,1 @@
+"0","distk2 = outer(1:nrow(breast.disj),1:nrow(breast.disj),FUN = function(i,j) chi2.dist(breast.disj,i,j))"

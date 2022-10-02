@@ -1,0 +1,2 @@
+"0","data <- data %>% "
+"0","  filter(pokedex_number<808)"

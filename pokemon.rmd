@@ -1,0 +1,68 @@
+---
+title: "Pokémon"
+author: "Théo Cavenne"
+date: "3/25/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(tidyverse)
+library(fastcluster)
+library(ggplot2)
+library(cluster)
+library(dendextend)
+library(factoextra)
+library(NbClust)
+library(FactoMineR)
+```
+
+Classification "Puissance"
+
+Préparation du dataframe dont on a besoin
+```{r}
+pokedex <- read.csv('pokedex.csv')
+```
+
+```{r}
+df <- pokedex %>% distinct(pokedex_number,.keep_all = TRUE)
+df <- df[-1:-2]
+```
+
+```{r}
+quanti <- df %>% select(hp,attack,defense,sp_attack,sp_defense,speed)
+summary(quanti)
+```
+
+Standardisation des données
+```{r}
+quanti.cr <- scale(quanti,center=T,scale=T)
+```
+
+CAH
+```{r}
+cah.ward = hclust(dist(quanti),method="ward.D")
+plot(cah.ward,hang=-1)
+plot(rev(cah.ward$height)[1:20],type="b")
+```
+On hésite entre 2 et 3.
+```{r}
+NbClust(quanti.cr, min.nc=2, max.nc=15, method="ward.D", index="all")
+```
+Confirmation du choix de k=3.
+
+```{r}
+groupes.cah = cutree(cah.ward,k=3)
+sort(groupes.cah)
+quanti$grp <- as.factor(groupes.cah)
+```
+
+```{r}
+pkmn.kmeans = kmeans(quanti,3,nstart=50)
+clusplot(quanti,pkmn.kmeans$cluster,labels=4,col.p=as.numeric(quanti$grp))
+```
+
+

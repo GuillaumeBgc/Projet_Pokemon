@@ -1,0 +1,1 @@
+{"frames":[],"message":"Error in NbClust(Iris.data, min.nc = 2, max.nc = 15, method = \"ward.D\",  : \n  impossible de trouver la fonction \"NbClust\"\n"}

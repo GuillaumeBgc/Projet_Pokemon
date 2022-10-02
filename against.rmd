@@ -1,0 +1,202 @@
+---
+title: "Pokémon"
+author: "Théo Cavenne"
+date: "3/30/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Libraries
+
+```{r}
+library(tidyverse)
+library(fastcluster)
+library(ggplot2)
+library(cluster)
+library(dendextend)
+library(factoextra)
+library(NbClust)
+library(FactoMineR)
+```
+
+# Import data
+
+```{r}
+pokedex <- read.csv('pokedex.csv', row.names=1,encoding="UTF-8")
+```
+
+# data cleaning
+
+On choisit ici de ne garder que les pokemons de base ( ie : pas leurs éventuelels formes)
+
+```{r}
+data <- pokedex %>% distinct(pokedex_number,.keep_all = TRUE)
+```
+
+On regarde les NA : 
+```{r}
+#NA : base_friendship  base_experience  percentage_male
+filter(data, is.na(base_friendship))$pokedex_number
+filter(data, is.na(base_experience))$pokedex_number
+filter(data, is.na(percentage_male))$pokedex_number
+```
+
+Les donnees manquantes correspondent aux pokemons de la 8e generation. On se permetra pour simplifier la gestion des NA. 
+
+```{r}
+data <- data %>% 
+  filter(pokedex_number<808)
+```
+
+Il reste cependant des donnees manquantes : 
+
+```{r}
+filter(data, is.na(percentage_male))$pokedex_number
+```
+
+En regardant de plus près, il s'agit des pokemon n'ayant pas de sexe(ie : assexué). 
+On choisit alors ces NA des 0, même si leur probabilite d'etre une femelle est également nulle. 
+
+```{r}
+data <- data %>% mutate_all(~replace(., is.na(.), 0))
+which(is.na(data))
+```
+# Problématique et choix des variables
+
+On s'interesse à classer les pokemon afin de permettre aux joueurs de se faire une equipe competitive. Les variables que nous avons jugé interessantes sont : 
+
+- les stats : hp attack defense sp_attack sp_defense speed jugeant l'aptitude au combat du pokémon
+- base_friendship : l'amitié pouvant influencer la manière de combattre le pokemon
+- Les types des Pokémon : repérer des groupes entre les types associées aux variables de combat. 
+
+Nous faisons le choix de ne pas prendre les variables "against_xxx", pensant qu'elles sont liées aux types des Pokémon. Le fait de prendre des variables quali plutot que quanti nous permettra de pondérer les distances entre individus. 
+
+```{r}
+data.compet <- data %>% select(pokedex_number, hp, attack, defense, sp_attack, sp_defense, speed,
+                               against_normal,against_fire,against_water,against_electric,
+                               against_grass,against_ice,against_fight,against_poison,against_ground,
+                               against_flying,against_psychic,against_bug,against_rock,against_ghost,
+                               against_dragon,against_dark,against_steel,against_fairy)
+data.compet[8:25] <- lapply(data.compet[c("against_normal","against_fire","against_water","against_electric",
+                                   "against_grass","against_ice","against_fight","against_poison",
+                                   "against_ground","against_dragon","against_dark","against_steel",
+                                   "against_fairy")], as.factor)
+```
+
+visualisation :
+
+```{r}
+pairs(data.compet[2:7])
+```
+
+# CAH AVEC TYPES
+
+On separe les données quali des quantis
+
+```{r}
+data.quali <- data.compet %>% select(against_normal,against_fire,against_water,against_electric,
+                               against_grass,against_ice,against_fight,against_poison,against_ground,
+                               against_flying,against_psychic,against_bug,against_rock,against_ghost,
+                               against_dragon,against_dark,against_steel,against_fairy)
+data.quanti <- data.compet %>% select(hp, attack, defense, sp_attack, sp_defense, speed)
+```
+
+matrice de distance pour les quantis : 
+
+```{r}
+dist.quanti <- dist(data.quanti)
+```
+
+matrice de distance pour les donnees quali : 
+
+d'abord on cree une table de contingence pour les types. 
+Sauf que l'on ne distingue plus les types 1 des types 2. Les differentes variables de la table deviennent donc uniquement les types; un type 1 etant different d'un type 2. 
+
+```{r}
+data.quali.dij <- acm.disjonctif(data.quali)
+```
+
+On calcule notre matrice de distance sur cette table : 
+
+```{r}
+data.disj <- as.matrix(data.quali.dij)
+# classic distance
+
+njl = apply(data.disj,2,sum)
+distk2 = sapply(1:nrow(data.disj),FUN=function(j){
+  apply(sapply(1:nrow(data.disj),FUN=function(i) {
+    abs(data.disj[j,]-data.disj[i,])},simplify = TRUE)/njl,2,sum)
+})
+distk2 = as.dist(distk2*nrow(data.disj)/ncol(data.disj))
+```
+
+On creer notre matrice finale en sommant les deux matrices et en ponderant. 
+La ponderation est arbitraire, on choisit de donner plus de poids aux variables quantitatives ici. 
+
+```{r}
+d= (5*dist.quanti + distk2)*1/6
+mat <- as.matrix(d)
+image(1:807,1:807,mat)
+```
+
+```{r}
+# methode de ward
+cah.ward = hclust(d,method="ward.D")
+plot(cah.ward,hang=-1)
+plot(rev(cah.ward$height)[1:15],type="b")
+```
+On choisit k = 3 
+
+```{r}
+gpe.ward = cutree(cah.ward,k=5)
+data.compet$grp <- as.factor(gpe.ward)
+des = catdes(data.compet,num.var=26)
+des
+plot(des,barplot=TRUE)
+```
+
+# CAH AVEC QUE QUANTI
+
+choix de k:
+```{r}
+d = dist.quanti
+cah.ward = hclust(d,method="ward.D")
+plot(cah.ward,hang=-1)
+plot(rev(cah.ward$height)[1:15],type="b")
+#NbClust(data.quanti, min.nc=2, max.nc=15, method="ward.D", index="all")
+```
+3 groupes
+
+
+```{r}
+gpe.ward = cutree(cah.ward,k=3)
+data.quanti$grp <- as.factor(gpe.ward)
+des = catdes(select(data.quanti, -id),num.var=7)
+plot(des,barplot=TRUE)
+```
+
+# KMEANS quanti
+
+```{r}
+pkmn.kmeans = kmeans(select(data.quanti,-c(id,grp)),3,nstart=50)
+clusplot(select(data.quanti,-c(id,grp)),pkmn.kmeans$cluster,labels=4,col.p=as.numeric(data.quanti$grp))
+```
+
+
+
+
+
+```{r}
+resAF <- FAMD(data.compet, ncp = 5, sup.var = NULL, ind = NULL, graph = TRUE)
+coord <- data.frame(resAF$ind$coord)
+
+I.intra = sapply(1:20,FUN=function(k) kmeans(coord,centers=k,nstart=50)$tot.withinss)
+plot(I.intra,type="b",xlab="nb groupes",ylab="inertie intra")
+
+test.kmeans <- kmeans(coord,3,nstart=50)
+clusplot(coord,test.kmeans$cluster,labels=4)
+```
+

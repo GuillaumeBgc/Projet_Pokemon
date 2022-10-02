@@ -1,0 +1,2 @@
+"0","I.intra = sapply(1:20,FUN=function(k) kmeans(data.quanti[1:6],centers=k,nstart=50)$tot.withinss)"
+"0","plot(I.intra,type=""b"",xlab=""nb groupes"",ylab=""inertie intra"")"

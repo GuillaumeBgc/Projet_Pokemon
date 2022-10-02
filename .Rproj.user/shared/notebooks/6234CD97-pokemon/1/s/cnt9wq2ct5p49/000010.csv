@@ -1,0 +1,1 @@
+"0","plot(rev(cah.ward$height)[1:20],type=""b"")"

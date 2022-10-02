@@ -1,0 +1,4 @@
+"0","data <- data %>% mutate_all(~replace(., is.na(.), 0))"
+"0","which(is.na(data))"
+"1","integer(0)
+"

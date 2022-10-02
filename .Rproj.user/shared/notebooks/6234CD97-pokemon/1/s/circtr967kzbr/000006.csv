@@ -1,0 +1,2 @@
+"0","pkmn.kmeans = kmeans(quanti,3,nstart=50)"
+"0","clusplot(quanti,pkmn.kmeans$cluster,labels=4,col.p=as.numeric(quanti$grp))"

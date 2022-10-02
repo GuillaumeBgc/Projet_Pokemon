@@ -1,0 +1,2 @@
+"0","CC.ward = hclust(dist(citycrime.sc),method=""ward.D"")"
+"0","plot(rev(CC.ward$height),type=""b"")"

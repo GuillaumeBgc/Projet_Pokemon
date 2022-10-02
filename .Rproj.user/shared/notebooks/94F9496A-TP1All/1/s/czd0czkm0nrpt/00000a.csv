@@ -1,0 +1,1 @@
+"0","plot(sqrt(as.vector(distk2)),as.vector(distacmk2),pch=20) ## OK, on a bien la premiere bissectrice -> egalite"

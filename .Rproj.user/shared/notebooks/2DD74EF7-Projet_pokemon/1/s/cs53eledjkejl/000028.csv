@@ -1,0 +1,3 @@
+"0","d = dist.quanti"
+"0","cah.ward = hclust(d,method=""ward.D"")"
+"0","plot(cah.ward,hang=-1)"

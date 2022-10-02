@@ -1,0 +1,4 @@
+"0","resAF <- FAMD(data.compet, ncp = 5, sup.var = NULL, ind = NULL, graph = TRUE)"
+"2","Error in FAMD(data.compet, ncp = 5, sup.var = NULL, ind = NULL, graph = TRUE) : 
+  impossible de trouver la fonction ""FAMD""
+"

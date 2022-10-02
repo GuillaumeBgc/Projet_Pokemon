@@ -1,0 +1,2 @@
+"0","data.quali <- data.compet %>% select(type_1, type_2)"
+"0","data.quanti <- data.compet %>% select(hp, attack, defense, sp_attack, sp_defense, speed)"

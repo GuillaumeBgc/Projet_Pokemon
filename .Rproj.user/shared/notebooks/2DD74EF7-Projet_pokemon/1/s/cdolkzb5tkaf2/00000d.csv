@@ -1,0 +1,8 @@
+"0","data.compet <- data.compet %>% select(-1)"
+"0","for (i in 1:807){"
+"0","  if(data.compet$type_2[i]==""""){"
+"0","    data.compet$type_2[i]=data.compet$type_1[i]"
+"0","  }"
+"0","}"
+"0",""
+"0","resAF <- FAMD(data.compet, ncp = 5, sup.var = NULL, ind = NULL, graph = TRUE)"

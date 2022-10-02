@@ -1,0 +1,6 @@
+BB=rnorm(100, mean = 0, sd = 1)
+plot(1:100,BB)
+
+AR3 = na.omit(stats::filter(BB, rep(1, 3)))
+acf(AR3)
+mean(na.omit(AR3))

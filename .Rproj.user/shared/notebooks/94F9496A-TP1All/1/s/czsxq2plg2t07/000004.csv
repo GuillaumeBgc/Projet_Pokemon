@@ -1,0 +1,4 @@
+"0","NbClust(Iris.data,min.nc = 2,max.nc = 15,method=""ward.D"",index=""all"")"
+"2","Error in NbClust(Iris.data, min.nc = 2, max.nc = 15, method = ""ward.D"",  : 
+  impossible de trouver la fonction ""NbClust""
+"

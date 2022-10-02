@@ -1,0 +1,4 @@
+"0","clusplot(distk2,cutree(breast.ward,2),labels=4,diss=TRUE)
+"
+"2","Error in nrow(tree$merge) : objet 'breast.ward' introuvable
+"

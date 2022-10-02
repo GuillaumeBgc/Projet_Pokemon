@@ -1,0 +1,348 @@
+---
+title: "Pokemon_classification"
+author: "Guillaume Theo Ewen"
+date: "29/03/2022"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Libraries
+
+```{r}
+library(tidyverse)
+library(fastcluster)
+library(ggplot2)
+library(cluster)
+library(dendextend)
+library(factoextra)
+library(NbClust)
+library(FactoMineR)
+```
+
+# Import data
+
+```{r}
+pokedex <- read.csv('pokedex.csv', row.names=1,encoding="UTF-8")
+```
+
+# data cleaning
+
+On choisit ici de ne garder que les Pokemon de base (ie : pas leurs éventuelles formes).
+```{r}
+data <- pokedex %>% distinct(pokedex_number,.keep_all = TRUE)
+```
+
+On regarde les NA : 
+```{r}
+summary(data)
+#NA : base_friendship  base_experience  percentage_male
+filter(data, is.na(base_friendship))$pokedex_number
+filter(data, is.na(base_experience))$pokedex_number
+filter(data, is.na(percentage_male))$pokedex_number
+```
+
+Les données manquantes correspondent aux Pokemon de la 8e géneration. On se permettra de s'en séparer pour simplifier la gestion des NA. 
+```{r}
+data <- data %>% 
+  filter(pokedex_number<808)
+```
+
+Il reste cependant des données manquantes : 
+```{r}
+filter(data, is.na(percentage_male))$pokedex_number
+```
+
+En regardant de plus près, il s'agit des Pokemon n'ayant pas de sexe (ie : assexué). 
+On choisit 0 pour ces Pokemon, même si leur probabilité d'être une femelle est également nulle. 
+```{r}
+data <- data %>% mutate_all(~replace(., is.na(.), 0))
+which(is.na(data))
+```
+
+
+# Problématique et choix des variables
+
+On s'intéresse à classer les Pokemon afin de permettre aux joueurs de se faire une équipe competitive. 
+Les variables que nous avons jugé intéressantes sont : 
+
+- les stats : hp attack defense sp_attack sp_defense speed jugeant l'aptitude au combat du Pokémon
+
+- Les types des Pokémon : repérer des groupes entre les types associés aux variables de combat. 
+
+```{r}
+data.compet <- data %>% select(pokedex_number, hp, attack, defense, sp_attack, sp_defense, speed, type_1, type_2)
+data.compet$type_1 <- as.factor(data.compet$type_1)
+data.compet$type_2 <- as.factor(data.compet$type_2)
+```
+
+Visualisation (boxplots et représentation) :
+```{r}
+boxplot(data.compet[2:7])
+pairs(data.compet[2:7])
+```
+
+
+# Première CAH sur les données quantitatives
+
+Données quantitatives :
+```{r}
+data.quanti <- data.compet %>% select(hp, attack, defense, sp_attack, sp_defense, speed)
+```
+
+Matrice de distance pour les variables quantitatives : 
+```{r}
+dist.quanti <- dist(data.quanti)
+```
+
+Choix de k et résultats de la CAH :
+```{r}
+cah.ward.quanti = hclust(dist.quanti,method="ward.D")
+plot(cah.ward.quanti,hang=-1)
+plot(rev(cah.ward.quanti$height)[1:15],type="b")
+#NbClust(data.quanti, min.nc=2, max.nc=15, method="ward.D", index="all")
+```
+On retient 4 groupes.
+
+Etude des groupes obtenus :
+Observation et interprétation des résultats de notre classification
+```{r}
+gpe.ward.quanti = cutree(cah.ward.quanti,k=4)
+data.quanti$grp <- as.factor(gpe.ward.quanti)
+des.quanti = catdes(data.quanti,num.var=7)
+plot(des.quanti,barplot=TRUE)
+```
+4 groupes :
+- Pokémon faibles.
+- Pokémon défensifs.
+- Pokémon offensifs et défensifs.
+- Pokémon rapide et faible défensivement.
+
+
+
+# Deuxième CAH sur les données mixtes avec against
+
+Jeu de données avec tous les against.
+```{r}
+data.compet.against <- data %>% select(pokedex_number, hp, attack, defense, sp_attack, sp_defense, speed,
+                               against_normal,against_fire,against_water,against_electric,
+                               against_grass,against_ice,against_fight,against_poison,against_ground,
+                               against_flying,against_psychic,against_bug,against_rock,against_ghost,
+                               against_dragon,against_dark,against_steel,against_fairy)
+data.compet.against[8:25] <- lapply(data.compet.against[c("against_normal","against_fire","against_water","against_electric",
+                                   "against_grass","against_ice","against_fight","against_poison",
+                                   "against_ground","against_dragon","against_dark","against_steel",
+                                   "against_fairy")], as.factor)
+```
+
+
+On sépare les données qualitatives des variables quantitatives.
+```{r}
+data.quali.against <- data.compet.against %>% select(against_normal,against_fire,against_water,against_electric,
+                               against_grass,against_ice,against_fight,against_poison,against_ground,
+                               against_flying,against_psychic,against_bug,against_rock,against_ghost,
+                               against_dragon,against_dark,against_steel,against_fairy)
+data.quanti.against <- data.compet.against %>% select(hp, attack, defense, sp_attack, sp_defense, speed)
+```
+
+Matrice de distance pour les variables quantitatives : 
+```{r}
+dist.quanti.against <- dist(data.quanti.against)
+```
+
+Matrice de distance pour les données qualitatives : 
+```{r}
+data.quali.dij <- ade4::acm.disjonctif(data.quali.against)
+```
+
+On calcule notre matrice de distance sur cette table : 
+```{r}
+data.disj <- as.matrix(data.quali.dij)
+# classic distance
+
+njl = apply(data.disj,2,sum)
+distk2 = sapply(1:nrow(data.disj),FUN=function(j){
+  apply(sapply(1:nrow(data.disj),FUN=function(i) {
+    abs(data.disj[j,]-data.disj[i,])},simplify = TRUE)/njl,2,sum)
+})
+distk2 = as.dist(distk2*nrow(data.disj)/ncol(data.disj))
+```
+
+On créé notre matrice finale en sommant les deux matrices et en pondérant. 
+La pondération est arbitraire, on choisit de donner plus de poids aux variables quantitatives ici. 
+Figure de la distancce entre chaque paire d'individus.
+```{r}
+d.against = (5*dist.quanti.against + distk2)*1/6
+mat <- as.matrix(d.against)
+image(1:807,1:807,mat)
+```
+
+Choix de k et résultats de la CAH :
+```{r}
+# methode de ward
+cah.ward.against = hclust(d.against,method="ward.D")
+plot(cah.ward.against,hang=-1)
+plot(rev(cah.ward.against$height)[1:15],type="b")
+```
+On choisit k = 5.
+
+Etude des groupes obtenus :
+Observation et interprétation des résultats de notre classification
+```{r}
+gpe.ward.against = cutree(cah.ward.against,k=5)
+data.compet.against$grp <- as.factor(gpe.ward.against)
+des.against = catdes(data.compet.against,num.var=26)
+plot(des.against,barplot=TRUE)
+```
+Interprétations plus complexe car il y a plus de classes.
+
+
+# Troisième CAH sur les données mixtes avec type
+
+On sépare les données qualitatives des données quantitatives.
+```{r}
+data.quali.type <- data.compet %>% select(type_1, type_2)
+data.quanti.type <- data.compet %>% select(hp, attack, defense, sp_attack, sp_defense, speed)
+```
+
+Matrice de distance pour les variables quantitatives : 
+```{r}
+dist.quanti.type <- dist(data.quanti.type)
+```
+
+Matrice de distance pour les données qualitatives : 
+
+Tout d'abord on créé une table de contingence pour les types. 
+Sauf que l'on ne distingue plus les types 1 des types 2. Les différentes variables de la table deviennent donc uniquement les types; un type 1 étant différent d'un type 2. 
+```{r}
+# data type 1 to binaries
+data.quali.type1 <- data.quali.type %>% 
+  select(type_1) %>% 
+  droplevels()
+
+data.disj.type1 <- ade4::acm.disjonctif(data.quali.type1)
+names(data.disj.type1) <- sub("type_1.", "", names(data.disj.type1))
+data.disj.type1$pokedex_number <- data.compet$pokedex_number
+
+# data type 2 to binaries
+data.quali.type2 <-data.quali.type %>% 
+  select(type_2) %>%
+  droplevels()
+
+data.disj.type2 <- ade4::acm.disjonctif(data.quali.type2) 
+names(data.disj.type2) <- sub("type_2.", "", names(data.disj.type2)) 
+data.disj.type2$pokedex_number <- data.compet$pokedex_number
+data.disj.type2 <- data.disj.type2 %>% select(-1)
+# data merge type 1 and type 2
+data.disj_type = bind_rows(data.disj.type1  , 
+                         data.disj.type2 ) %>% 
+  group_by(pokedex_number) %>%
+  summarise_all(sum) %>% select(-1)
+```
+
+On calcule notre matrice de distance sur cette table : 
+```{r}
+data.disj <- as.matrix(data.disj_type)
+# classic distance
+
+njl = apply(data.disj,2,sum)
+distk2 = sapply(1:nrow(data.disj),FUN=function(j){
+  apply(sapply(1:nrow(data.disj),FUN=function(i) {
+    abs(data.disj[j,]-data.disj[i,])},simplify = TRUE)/njl,2,sum)
+})
+distk2 = as.dist(distk2*nrow(data.disj)/ncol(data.disj))
+```
+
+On créé notre matrice finale en sommant les deux matrices et en pondérant. 
+La pondération est arbitraire, on choisit de donner plus de poids aux variables quantitatives ici. 
+```{r}
+d.type = (5*dist.quanti.type + distk2)*1/6
+```
+
+Choix de k et résultats de la CAH
+```{r}
+# methode de ward
+cah.ward.type = hclust(d.type,method="ward.D")
+plot(cah.ward.type,hang=-1)
+plot(rev(cah.ward.type$height)[1:15],type="b")
+```
+On choisit k = 6.
+
+Etude des groupes obtenus :
+Observation et interprétation des résultats de notre classification
+```{r}
+data.disj_type$id <- data.compet$pokedex_number
+data.quanti$id <- data.compet$pokedex_number
+data.final <- merge(data.disj_type, data.quanti, on='id')
+data.final <-data.final %>%  select(-1)
+
+gpe.ward.type = cutree(cah.ward.type,k=6)
+data.final$grp <- as.factor(gpe.ward.type)
+des.type = catdes(data.final,num.var=25)
+plot(des.type,barplot=TRUE)
+```
+
+
+# KMEANS sur les données quantitatives
+
+Représentation de la perte d'inertie :
+```{r}
+I.intra = sapply(1:20,FUN=function(k) kmeans(data.quanti,centers=k,nstart=50)$tot.withinss)
+plot(I.intra,type="b",xlab="nb groupes",ylab="inertie intra")
+```
+
+
+Kmeans pour k=10 :
+```{r}
+pkmn.kmeans.10 = kmeans(select(data.quanti,-c(id,grp)),10,nstart=50)
+clusplot(select(data.quanti,-c(id,grp)),pkmn.kmeans.10$cluster,labels=4)
+```
+Difficilement interprétable, on essaye k=4.
+
+Kmeans pour k=4 :
+```{r}
+pkmn.kmeans.4 = kmeans(select(data.quanti,-c(id,grp)),4,nstart=50)
+clusplot(select(data.quanti,-c(id,grp)),pkmn.kmeans.4$cluster,labels=4,col.p=as.numeric(data.quanti$grp))
+```
+Résultats plus pertinent et conforte le choix de 4 groupes.
+
+
+
+# KMEANS sur des coordonnées factorielles
+
+```{r}
+resAF <- FAMD(data.compet, ncp = 5, sup.var = NULL, ind = NULL, graph = TRUE)
+coord <- data.frame(resAF$ind$coord)
+
+I.intra = sapply(1:20,FUN=function(k) kmeans(coord,centers=k,nstart=100)$tot.withinss)
+plot(I.intra,type="b",xlab="nb groupes",ylab="inertie intra")
+
+test.kmeans <- kmeans(coord,3,nstart=100)
+clusplot(coord,test.kmeans$cluster,labels=4)
+```
+Cette représentation change d'un chargement à un autre. Peut-être du à l'aléa des kmeans.
+
+
+# Bonus
+```{r}
+data.compet <- data.compet %>% select(-1)
+```
+
+```{r}
+for (i in 1:807){
+  if(data.compet$type_2[i]==""){
+    data.compet$type_2[i]=data.compet$type_1[i]
+  }
+}
+
+resAF <- FAMD(data.compet, ncp = 5, sup.var = NULL, ind = NULL, graph = TRUE)
+
+coord <- data.frame(resAF$ind$coord)
+test.kmeans <- kmeans(coord,3,nstart=50)
+clusplot(select(data.quanti,-c(id,grp)),test.kmeans$cluster,labels=4,col.p=as.numeric(data.quanti$grp))
+```
+Résultats pas interprétables.

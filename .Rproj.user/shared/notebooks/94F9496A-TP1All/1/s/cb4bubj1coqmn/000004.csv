@@ -1,0 +1,4 @@
+"0","Iris.data   = iris[,1:4]"
+"0","Iris.espece = iris$Species"
+"0",""
+"0","boxplot(Iris.data)"

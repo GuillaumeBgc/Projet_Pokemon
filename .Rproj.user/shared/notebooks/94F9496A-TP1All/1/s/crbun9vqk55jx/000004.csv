@@ -1,0 +1,2 @@
+"0","par(mfrow=c(1,2))"
+"0","plot(LoC~LoM,data=LCdata,pch=20) ;plot(LaM~LoM,data=LCdata,pch=20)"

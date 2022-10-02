@@ -1,0 +1,5 @@
+"0","LCdata    = LoupChien[LoupChien$espece!=""inconnu"",1:3]"
+"0","LCespece  = LoupChien$espece[LoupChien$espece!=""inconnu""]"
+"0",""
+"0","CorDist = as.dist((1-cor(t(LCdata)))/2)"
+"0","image(1:nrow(LCdata),1:nrow(LCdata),(1-cor(t(LCdata)))/2)"

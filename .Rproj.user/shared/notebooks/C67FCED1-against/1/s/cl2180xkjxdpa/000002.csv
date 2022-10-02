@@ -1,0 +1,1 @@
+"0","pokedex <- read.csv('pokedex.csv', row.names=1,encoding=""UTF-8"")"

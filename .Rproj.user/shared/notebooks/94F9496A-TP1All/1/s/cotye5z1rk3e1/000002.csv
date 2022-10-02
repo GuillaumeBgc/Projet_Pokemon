@@ -1,0 +1,6 @@
+"0","njl = apply(breast.disj,2,sum)"
+"0","distk2 = sapply(1:nrow(breastData),FUN=function(j){"
+"0","  apply(sapply(1:nrow(breastData),FUN=function(i) {"
+"0","    abs(breast.disj[j,]-breast.disj[i,])},simplify = TRUE)/njl,2,sum)"
+"0","})"
+"0","distk2 = as.dist(distk2*nrow(breastData)/ncol(breastData))"

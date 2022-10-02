@@ -1,0 +1,2 @@
+"0","citycrime = read.table(""citycrime.dat"",header=TRUE)"
+"0","head(citycrime)"

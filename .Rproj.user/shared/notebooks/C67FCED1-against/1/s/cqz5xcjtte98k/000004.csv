@@ -1,0 +1,4 @@
+"0","data.quali.dij <- acm.disjonctif(data.quali)"
+"2","Error in acm.disjonctif(data.quali) : 
+  impossible de trouver la fonction ""acm.disjonctif""
+"

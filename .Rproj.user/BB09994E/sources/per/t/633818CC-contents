@@ -1,0 +1,215 @@
+#### TP Dataiku - Etude Datamining ####
+
+setwd("~/Desktop/M1 MAS/Semestre 2/Marketing - DataMining/TP RFM")
+
+### 0) Initialisation du projet ###
+
+## Etape 1 – Installation des packages nécessaires ##
+
+library(dplyr)
+library(data.table)
+library(tidyverse)
+
+## Etape 2 – Téléchargement des données initiales ##
+
+# Les données sont disponibles sur Cursus.
+
+## Etape 3 – Import des fichiers csv ##
+
+r_complement_individu_2016 <- read.csv("R_COMPLEMENT_INDIVIDU_2016.csv", sep=";")
+r_individu_2016 <- read.csv("R_INDIVIDU_2016.csv", sep=";")
+r_magasin <- read.csv("R_MAGASIN.csv", sep=";")
+r_referentiel<- read.csv("R_REFERENTIEL.csv", sep=";")
+r_tickets_2016 <- read.csv("R_TICKETS_2016.csv", sep=";") 
+r_typo_produit <- read.csv("R_TYPO_PRODUIT.csv", sep=";")
+
+
+### 1) Construction de la table finale permettant l’analyse des tickets et l’analyse des clients ###
+
+## Etape 1 – Construction de la table au niveau Individus ##
+
+r_individu <- left_join(r_individu_2016, r_complement_individu_2016, by ="ID_INDIVIDU")
+
+## Etape 2 – Calcul Age, Ancienneté sur la table « Individus » ##
+
+date_fin_extraction <- as.Date("2016-08-31")
+
+r_individu$DATE_NAISS_A_M_J <- as.Date(paste(r_individu$DATE_NAISS_A,r_individu$DATE_NAISS_M, r_individu$DATE_NAISS_J,sep="-"), format="%Y-%m-%d")
+
+r_individu$AGE <- as.numeric(floor((date_fin_extraction-r_individu$DATE_NAISS_A_M_J)/365.24219))
+
+r_individu$AGE <- ifelse(r_individu$AGE<18|r_individu$AGE>90,NA,r_individu$AGE)
+
+r_individu$DATE_CREATION_CARTE <- as.Date(r_individu$DATE_CREATION_CARTE, format="%d/%m/%Y")
+
+r_individu$ANCIENNETE <- as.numeric(floor((date_fin_extraction-r_individu$DATE_CREATION_CARTE)/365.24219))
+
+r_individu$ANCIENNETE <- ifelse(r_individu$ANCIENNETE<0,NA,r_individu$ANCIENNETE)
+
+summary(r_individu)
+
+r_individu_OK <- r_individu
+
+## Etape 3 – Travail sur la table des Tickets : Sélection du bon périmètre sur la table ticket ##
+
+date_debut_extraction <- as.Date("2014-09-01")
+
+r_tickets_2016 <- filter(r_tickets_2016, 
+                        as.Date(DATE_ACHAT, format="%d/%m/%Y")>=date_debut_extraction &
+                        as.Date(DATE_ACHAT, format="%d/%m/%Y")<=date_fin_extraction)
+
+## Etape 4 – Enrichissement de la table des TICKETS ##
+
+r_matrice_travail <- left_join(r_tickets_2016, r_individu_OK, by="ID_INDIVIDU")
+
+r_matrice_travail <- left_join(r_matrice_travail, r_magasin, by="CODE_BOUTIQUE")
+
+r_matrice_travail$EAN <- as.character(r_matrice_travail$EAN)
+r_matrice_travail <- left_join(r_matrice_travail, r_referentiel, by="EAN")
+
+r_matrice_travail <- left_join(r_matrice_travail, r_typo_produit, by="MODELE")
+
+r_matrice_travail <- subset(r_matrice_travail, select=c(DATE_ACHAT, EAN, 
+                                                        ID_INDIVIDU, ID_FOYER.x, 
+                                                        CODE_LIGNE, TYPE_LIGNE, 
+                                                        NUM_TICKET, QUANTITE, 
+                                                        PRIX_AP_REMISE, REMISE, 
+                                                        REMISE_VALEUR, CODE_BOUTIQUE, 
+                                                        REGIONS, CENTRE_VILLE, TYPE_MAGASIN, 
+                                                        REGIONS_COMMERCIAL, MODELE, Ligne, 
+                                                        Famille))
+
+
+### 2) Auditer la table r_Matrice_travail et r_individu_OK ###
+
+## Etape 1 – Analyse de la table r_Matrice_travail ##
+
+summary(r_matrice_travail)
+r_matrice_travail$DATE_ACHAT <- as.Date(r_matrice_travail$DATE_ACHAT, format="%d/%m/%Y")
+
+r_matrice_travail$REGIONS_COMMERCIAL <- as.factor(r_matrice_travail$REGIONS_COMMERCIAL)
+
+r_matrice_travail$CENTRE_VILLE <- as.factor(r_matrice_travail$CENTRE_VILLE)
+
+r_matrice_travail <- r_matrice_travail %>% rename(ID_FOYER = ID_FOYER.x)
+
+matrice_travail_ok <- r_matrice_travail
+
+### 3) Calculer avec la table Matrice_travail_OK contenant les modifications précédentes ###
+
+## Etape 1 – Déterminer la règle permettant d’identifier un ticket d’achat unique = une visite en magasin ##
+
+
+Ticket_174591 <- matrice_travail_ok %>% filter(ID_INDIVIDU=='174591')
+
+#NUM_TICKET
+#ID_INDIVIDU
+#DATE_ACHAT
+#CODE_BOUTIQUE
+
+## Etape 2 – Calculer par individu les indicateurs suivants ##
+
+visites <- matrice_travail_ok %>% 
+            group_by(NUM_TICKET,ID_INDIVIDU,DATE_ACHAT,CODE_BOUTIQUE) %>%
+            summarise(CA_INDIVIDU=sum(PRIX_AP_REMISE),
+                      NB_PRODUITS=n(),
+                      PRIX_MOYEN=mean(PRIX_AP_REMISE))
+
+individus <- visites %>% 
+              group_by(ID_INDIVIDU) %>%
+              summarise(NB_VISITES=n(),
+                        CA_MOY_VISITE=mean(CA_INDIVIDU),
+                        MONTANT_CUMULE=sum(CA_INDIVIDU),
+                        NB_PRDT_MOY_VISITE=mean(NB_PRODUITS))
+
+table1 <- visites %>%
+  group_by(ID_INDIVIDU) %>%
+  summarise(RECENCE=min(as.numeric(floor((Sys.Date()-as.Date(DATE_ACHAT, format="%d/%m/%Y"))/30.4167))),
+            NB_MAG_DIFF=n_distinct(CODE_BOUTIQUE))
+
+matrice_travail_ok$MODELE <- as.factor(matrice_travail_ok$MODELE)
+summary(matrice_travail_ok)
+
+table2 <- matrice_travail_ok %>%
+  group_by(ID_INDIVIDU) %>%
+  summarise(NB_LIGNES_DIFF=n_distinct(Ligne),
+            NB_FAM_DIFF=n_distinct(Famille),
+            NB_CADEAUX=n_distinct(REMISE)-1)
+
+mag_gestionnaire <- r_complement_individu_2016 %>% select(ID_INDIVIDU, CODE_MAGASIN)
+
+visites <- inner_join(visites,mag_gestionnaire,by="ID_INDIVIDU")
+
+table3 <- visites %>% group_by(ID_INDIVIDU) %>%
+       summarise(BOOL=(CODE_MAGASIN==CODE_BOUTIQUE))
+table3 <- table3 %>% group_by(ID_INDIVIDU) %>% 
+       summarise(PART_VIST_MAG_GEST=sum(BOOL)/n())
+
+r_Matrice_finale <- inner_join(table1,table2, by="ID_INDIVIDU")
+r_Matrice_finale <- inner_join(r_Matrice_finale,table3, by="ID_INDIVIDU")
+
+
+### 4) Constitution de la RFM ###
+
+## Etape 1 – Constructions de la segmentation RFM ##
+
+segmentation_RFM <- inner_join(r_Matrice_finale,individus, by="ID_INDIVIDU") %>%
+                      select(ID_INDIVIDU, MONTANT_CUMULE, NB_VISITES, RECENCE) %>% 
+                      rename(MONTANT=MONTANT_CUMULE, FREQUENCE=NB_VISITES)
+
+Montant <- quantile(segmentation_RFM$MONTANT, probs=seq(0, 1, 1/3))
+Frequence <- quantile(segmentation_RFM$FREQUENCE, probs=seq(0, 1, 1/3))
+Recence <- quantile(segmentation_RFM$RECENCE, probs=seq(0, 1, 1/3))
+
+quantiles <- data.frame(Montant,Frequence,Recence)
+
+
+FM_faible <- segmentation_RFM %>% filter(
+  (MONTANT<=quantiles$Montant[2] & FREQUENCE<=quantiles$Frequence[3])|
+  (FREQUENCE<=quantiles$Frequence[2] & MONTANT<=quantiles$Montant[3]))
+FM_faible <- FM_faible %>% mutate(FM_faible, FM="FM Faible") %>% select(ID_INDIVIDU, FM)
+
+FM_moyenne <- segmentation_RFM %>% filter(
+  (MONTANT>quantiles$Montant[2] & MONTANT<=quantiles$Montant[3]) & (FREQUENCE>quantiles$Frequence[2] & FREQUENCE<=quantiles$Frequence[3])|
+  (MONTANT<=quantiles$Montant[2] & FREQUENCE>quantiles$Frequence[3])|
+  (FREQUENCE<=quantiles$Frequence[2] & MONTANT>quantiles$Montant[3])) 
+FM_moyenne <- FM_moyenne %>% mutate(FM_moyenne, FM="FM Moyenne") %>% select(ID_INDIVIDU, FM)
+
+FM_forte <- segmentation_RFM %>% filter(
+  (MONTANT>quantiles$Montant[3] & FREQUENCE>quantiles$Frequence[2])|
+  (FREQUENCE>quantiles$Frequence[3] & MONTANT>quantiles$Montant[2])) 
+FM_forte <- FM_forte %>% mutate(FM_forte, FM="FM Forte") %>% select(ID_INDIVIDU, FM)
+
+FM <- full_join(FM_faible, FM_moyenne)
+FM <- full_join(FM, FM_forte)
+
+segmentation_RFM <- inner_join(segmentation_RFM,FM)
+
+RFM1 <- segmentation_RFM %>% filter((FM=='FM Faible' & RECENCE<=quantiles$Recence[2])) %>% mutate(RFM1, RFM='RFM1')
+RFM2 <- segmentation_RFM %>% filter((FM=='FM Faible' & (RECENCE>quantiles$Recence[2] & RECENCE<=quantiles$Recence[3])))
+RFM3 <- segmentation_RFM %>% filter((FM=='FM Faible' & RECENCE>quantiles$Recence[3]))
+RFM4 <- segmentation_RFM %>% filter((FM=='FM Moyenne' & RECENCE<=quantiles$Recence[2]))
+RFM5 <- segmentation_RFM %>% filter((FM=='FM Moyenne' & (RECENCE>quantiles$Recence[2] & RECENCE<=quantiles$Recence[3])))
+RFM6 <- segmentation_RFM %>% filter((FM=='FM Moyenne' & RECENCE>quantiles$Recence[3]))
+RFM7 <- segmentation_RFM %>% filter((FM=='FM Forte' & RECENCE<=quantiles$Recence[2]))
+RFM8 <- segmentation_RFM %>% filter((FM=='FM Forte' & (RECENCE>quantiles$Recence[2] & RECENCE<=quantiles$Recence[3])))
+RFM9 <- segmentation_RFM %>% filter((FM=='FM Forte' & RECENCE>quantiles$Recence[3]))
+
+RFM <- full_join(RFM1,RFM2)
+RFM <- full_join(RFM,RFM3)
+RFM <- full_join(RFM,RFM4)
+RFM <- full_join(RFM,RFM5)
+RFM <- full_join(RFM,RFM6)
+RFM <- full_join(RFM,RFM7)
+RFM <- full_join(RFM,RFM8)
+RFM <- full_join(RFM,RFM9)
+
+segmentation_RFM <- inner_join(segmentation_RFM,RFM)
+
+### 5) Grands constats ###
+
+## Etape 1 – Calculer les variables suivantes, elles permettront d’observer les différents groupes ##
+
+
+
+
